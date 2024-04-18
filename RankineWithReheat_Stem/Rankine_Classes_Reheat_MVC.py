@@ -6,6 +6,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 from copy import deepcopy as dc
 from scipy.optimize import minimize
+#these imports are necessary for drawing a matplot lib graph on my GUI
+#no simple widget for this exists in QT Designer, so I have to add the widget in code.
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.figure import Figure
 #endregion
 
 #region class definitions
@@ -46,18 +50,38 @@ class rankineModel():
         self.satVapPlotData = StateDataForPlotting()
         self.upperCurve = StateDataForPlotting()
         self.lowerCurve = StateDataForPlotting()
-
 class rankineView():
     def __init__(self):
         """
         Empty constructor by design
         """
+    def MakeCanvas(self):
+            """
+            Create a place to make graph of Rankine cycle
+            Step 1:  create a Figure object called self.figure
+            Step 2:  create a FigureCanvasQTAgg object called self.canvas
+            Step 3:  create an axes object for making plot
+            Step 4:  add self.canvas to self.widgetsVerticalLayout which is a Vertical box layout
+            :return:
+            """
+            # Step 1.
+            self.figure = Figure(figsize=(1, 1), tight_layout=True, frameon=True)
+            # Step 2.
+            self.canvas = FigureCanvasQTAgg(self.figure)
+            # Step 3.
+            self.ax = self.figure.add_subplot()
+            # Step 4.
+            self.Layout_Plot.addWidget(NavigationToolbar2QT(self.canvas))
+            self.Layout_Plot.addWidget(self.canvas)
+    def SetupCanvasInteraction(self, window):
+        self.canvas.mpl_connect("motion_notify_event", window.mouseMoveEvent_Canvas)
     def setWidgets(self, *args):
         self.InputWidgets, self.DisplayWidgets = args
         self.UnpackWidgets()
+        self.MakeCanvas()
     def UnpackWidgets(self):
         #Unpacks display widgets
-        self.figure, self.canvas, self.ax, self.lbl_H1, self.lbl_H2, self.lbl_H3, self.lbl_H4, self.lbl_H5, self.lbl_H6,\
+        self.Layout_Plot, self.lbl_H1, self.lbl_H2, self.lbl_H3, self.lbl_H4, self.lbl_H5, self.lbl_H6,\
         self.lbl_TurbineWork_1, self.lbl_TurbineWork_2, self.lbl_PumpWork, self.lbl_HeatIn_1,\
         self.lbl_HeatIn_2, self.lbl_ThermalEfficiency, self.lbl_SatPropHigh, self.lbl_SatPropMid,\
         self.lbl_SatPropLow, self.cmb_XAxis, self.cmb_YAxis, self.chk_logX,\
@@ -447,12 +471,11 @@ class rankineView():
             plt.show()
         else:
             self.canvas.draw()
-
 class rankineController():
     def __init__(self, *args):
         """
-        The rankineController is the only object that the GUI should make requests of.  It contains a Model and View.
-        In the GUI, all slots should be connected to functions of the rankineController.
+        Create rankineModel object.  The rankineController class updates the model based on user input
+        and updates the rankineView as well
         :param *args: a tuple containing (inputWidgets, displayWidgets)
         """
         self.InputWidgets, self.DisplayWidgets = args
@@ -469,6 +492,8 @@ class rankineController():
         self.le_TurbineEff, self.le_TurbineEff_2, self.rb_SI, self.chk_logX, \
         self.chk_logY, self.cmb_XAxis, self.cmb_YAxis = self.InputWidgets
 
+    def SetupCanvasInteraction(self, window):
+        self.View.SetupCanvasInteraction(window)
     def optimize(self):
         def objFn(P):
             """
@@ -505,8 +530,8 @@ class rankineController():
         """
         T = float(self.le_TurbineInletCondition.text())  # $UNITS$
         T_2 = float(self.le_TurbineInletCondition_2.text())
-        x1=self.rdo_Quality.isChecked()
-        x2=self.rdo_Quality_2.isChecked()
+        x1 = self.rdo_Quality.isChecked()
+        x2 = self.rdo_Quality_2.isChecked()
 
         self.Model.t_high = None if x1 else (T if self.Model.SI else UC.F_to_C(T))  # $UNITS$
         self.Model.t_high_2 = None if x2 else (T_2 if self.Model.SI else UC.F_to_C(T_2))  # $UNITS$
@@ -514,21 +539,18 @@ class rankineController():
         self.Model.turbine_eff_2 = float(self.le_TurbineEff_2.text())
 
         p_CF = 1.0 if self.Model.SI else UC.psi_to_bar
-        self.Model.p_high = p_CF*float(self.le_PHigh.text())
-        self.Model.p_mid = p_CF*float(self.le_PMid.text())
-        self.Model.p_low = p_CF*float(self.le_PLow.text())
+        self.Model.p_high = p_CF * float(self.le_PHigh.text())
+        self.Model.p_mid = p_CF * float(self.le_PMid.text())
+        self.Model.p_low = p_CF * float(self.le_PLow.text())
 
         self.Model.turbine_eff = float(self.le_TurbineEff.text())
         self.Model.turbine_eff_2 = float(self.le_TurbineEff_2.text())
-
     def updateModel(self):
-        # update the model to reflect the input widgets state
-        # $UNITS$ since inputs can be SI or English, I need to convert to SI here for pressures and temperature
+        # update the model
         self.readConditionsFromGUI()
         # do the calculation
         self.calc_efficiency()
         self.updateView()
-
     def updateUnits(self):
         # Switching units should not change the model, but should update the view
         self.Model.SI = self.rb_SI.isChecked()

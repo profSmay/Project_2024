@@ -1,14 +1,8 @@
 #region imports
 import sys
 from PyQt5 import QtWidgets as qtw
-from PyQt5 import QtCore as qtc
 from Rankine_GUI import Ui_Form
 from Rankine_Classes_Reheat_MVC import rankineController
-from UnitConversions import UnitConverter as UC
-#these imports are necessary for drawing a matplot lib graph on my GUI
-#no simple widget for this exists in QT Designer, so I have to add the widget in code.
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
-from matplotlib.figure import Figure
 #endregion
 
 #region class definitions
@@ -20,10 +14,9 @@ class MainWindow(qtw.QWidget, Ui_Form):
         super().__init__()  #if you inherit, you generally should run the parent constructor first.
         # Main UI code goes here
         self.setupUi(self)
-        self.MakeCanvas()
 
         #Catagorize the widgets as display or input
-        self.DisplayWidgets = (self.figure, self.canvas, self.ax, self.lbl_H1, self.lbl_H2, self.lbl_H3, self.lbl_H4, self.lbl_H5, self.lbl_H6,
+        self.DisplayWidgets = (self.Layout_Plot, self.lbl_H1, self.lbl_H2, self.lbl_H3, self.lbl_H4, self.lbl_H5, self.lbl_H6,
                                self.lbl_TurbineWork_1, self.lbl_TurbineWork_2, self.lbl_PumpWork, self.lbl_HeatIn_1,
                                self.lbl_HeatIn_2, self.lbl_ThermalEfficiency, self.lbl_SatPropHigh, self.lbl_SatPropMid,
                                self.lbl_SatPropLow, self.cmb_XAxis, self.cmb_YAxis, self.chk_logX,
@@ -38,6 +31,7 @@ class MainWindow(qtw.QWidget, Ui_Form):
                              self.cmb_YAxis)
         #Instantiate a new rankine controller
         self.RC=rankineController(self.InputWidgets, self.DisplayWidgets)
+        self.RC.SetupCanvasInteraction(self)
         #Note:  all slots should be functions of the rankine controller
         self.AssignSlots()
         self.RC.updateModel()
@@ -76,28 +70,6 @@ class MainWindow(qtw.QWidget, Ui_Form):
         sUnit='kJ/(kg*K)' if self.rb_SI.isChecked() else 'BTU/(lb*R)'
         TUnit='C' if self.rb_SI.isChecked() else 'F'
         self.setWindowTitle('s:{:0.2f} {}, T:{:0.2f} {}'.format(self.oldXData,sUnit, self.oldYData,TUnit))
-
-    def MakeCanvas(self):
-        """
-        Create a place to make graph of Rankine cycle
-        Step 1:  create a Figure object called self.figure
-        Step 2:  create a FigureCanvasQTAgg object called self.canvas
-        Step 3:  create an axes object for making plot
-        Step 4:  add self.canvas to self.widgetsVerticalLayout which is a Vertical box layout
-        :return:
-        """
-        #Step 1.
-        self.figure=Figure(figsize=(1,1),tight_layout=True, frameon=True)
-        #Step 2.
-        self.canvas=FigureCanvasQTAgg(self.figure)
-        #Step 3.
-        self.ax = self.figure.add_subplot()
-        #Step 4.
-        self.Layout_Plot.addWidget(NavigationToolbar2QT(self.canvas,self))
-        self.Layout_Plot.addWidget(self.canvas)
-        self.canvas.mpl_connect("motion_notify_event", self.mouseMoveEvent_Canvas)
-
-
 #endregion
 
 #if this module is being imported, this won't run. If it is the main module, it will run.
